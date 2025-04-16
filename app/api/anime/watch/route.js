@@ -1,5 +1,3 @@
-import { StreamingServers } from "@consumet/extensions";
-import AnimeKai from "@consumet/extensions/dist/providers/anime/animekai";
 import { NextResponse } from "next/server";
 
 const fetchStreamingData = async (episodeId, isDub) => {
@@ -8,15 +6,12 @@ const fetchStreamingData = async (episodeId, isDub) => {
       throw new Error("Invalid or missing episodeId");
     }
 
-    const animekai = new AnimeKai();
-    const data = await animekai.fetchEpisodeSources(
-      episodeId,
-      StreamingServers.MegaUp,
-      !!isDub ? "dub" : "sub"
-    );
+    const apiUrl = `https://no-drab.vercel.app/anime/animekai/watch/${episodeId}${isDub === "true" ? "?dub=true" : ""}`;
 
+    const res = await fetch(apiUrl);
+    const data = await res.json();
 
-    if (!data || (data.message === "Anime not found" && (!Array.isArray(data) || data.length < 1))) {
+    if (!data || data.sources?.length === 0) {
       console.warn(`No data found for episode ${episodeId}`);
       return [];
     }
@@ -30,9 +25,8 @@ const fetchStreamingData = async (episodeId, isDub) => {
 
 export async function GET(req, { params }) {
   try {
-    const episodeId = decodeURIComponent(req.nextUrl.searchParams.get("episodeid"))
+    const episodeId = decodeURIComponent(req.nextUrl.searchParams.get("episodeid"));
     const isdub = req.nextUrl.searchParams.get("isdub");
-
 
     if (!episodeId) {
       return NextResponse.json({ error: "Episode ID is required" }, { status: 400 });
