@@ -1,9 +1,6 @@
 "use server";
-import { ANIME } from "@consumet/extensions";
+
 import { getMappings } from "./mapping";
-
-const kaianime = new ANIME.AnimeKai();
-
 
 export const getEpisodes = async (id, title) => {
   if (!id || !title) return [];
@@ -12,12 +9,13 @@ export const getEpisodes = async (id, title) => {
     const mappingID = await getMappings(title);
     if (!mappingID) return [];
 
-    const animeInfo = await kaianime.fetchAnimeInfo(mappingID);
-    let episodes = animeInfo?.episodes || [];
+    // Fetch from your own AnimeKai proxy API
+    const animeKaiEpisodes = await fetchAnimeKaiEpisodes(mappingID);
+    let episodes = animeKaiEpisodes || [];
 
     const coverMeta = await fetchEpisodeMeta(id);
     if (coverMeta.length > 0) {
-      episodes = await CombineEpisodeMeta(episodes, coverMeta);
+      episodes = CombineEpisodeMeta(episodes, coverMeta);
     }
 
     return episodes;
@@ -27,10 +25,22 @@ export const getEpisodes = async (id, title) => {
   }
 };
 
+async function fetchAnimeKaiEpisodes(mappingId) {
+  try {
+    const res = await fetch(`https://no-drab.vercel.app/anime/animekai/info?id=${mappingId}`);
+    if (!res.ok) throw new Error(`Failed to fetch AnimeKai episodes: ${res.status}`);
+
+    const data = await res.json();
+    return data.episodes || [];
+  } catch (error) {
+    console.error("Error fetching AnimeKai episodes:", error);
+    return [];
+  }
+}
+
 function CombineEpisodeMeta(episodeData, imageData) {
   const episodeImages = {};
 
-  // Map image data by episode number
   imageData.forEach((image) => {
     const episodeNum = image.number || image.episode;
     if (episodeNum) {
@@ -38,7 +48,6 @@ function CombineEpisodeMeta(episodeData, imageData) {
     }
   });
 
-  // Process each episode
   episodeData.forEach((episode) => {
     const episodeNum = episode.number;
     if (episodeNum in episodeImages) {
@@ -47,7 +56,6 @@ function CombineEpisodeMeta(episodeData, imageData) {
       episode.image = imageData.img || imageData.image || null;
       episode.description = imageData.description || imageData.overview || imageData.summary || '';
 
-      // Handle different title formats
       if (typeof imageData.title === 'object') {
         episode.title = imageData.title.en || imageData.title['x-jat'] || `Episode ${episodeNum}`;
       } else {
@@ -58,6 +66,7 @@ function CombineEpisodeMeta(episodeData, imageData) {
 
   return episodeData;
 }
+
 async function fetchEpisodeMeta(id) {
   if (!id) return [];
 
